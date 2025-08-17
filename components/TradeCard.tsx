@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { TrendingUp, TrendingDown, DollarSign, Target, Calendar, Eye, Trash2, Edit, Image as ImageIcon, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { Trade } from '@/types/trade'
@@ -49,10 +50,11 @@ export default function TradeCard({ trade, onView, onEdit, onDelete, index }: Tr
       >
       {trade.images.length > 0 && (
         <div className="relative h-48 bg-muted overflow-hidden">
-          <img
+          <Image
             src={trade.images[0].url}
             alt="Trade screenshot"
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { Plus, X, TrendingUp, TrendingDown, DollarSign, Target, Calendar, FileText, Brain } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -278,12 +279,13 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                     key={image.id}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="relative group"
+                    className="relative group h-24"
                   >
-                    <img
+                    <Image
                       src={image.url}
                       alt={image.name}
-                      className="w-full h-24 object-cover rounded-lg"
+                      fill
+                      className="object-cover rounded-lg"
                     />
                     <button
                       type="button"

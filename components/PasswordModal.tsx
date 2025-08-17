@@ -59,7 +59,7 @@ export default function PasswordModal({
         setError(data.error || 'Incorrect password');
         setPassword('');
       }
-    } catch (error) {
+    } catch {
       setError('Failed to verify password');
       setPassword('');
     } finally {

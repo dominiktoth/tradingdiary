@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase'
+import { supabase } from './supabase'
 import { Trade, TradeImage } from '@/types/trade'
 
 export async function uploadImage(file: File, tradeId: string): Promise<string | null> {
@@ -8,7 +8,7 @@ export async function uploadImage(file: File, tradeId: string): Promise<string |
     const fileExt = file.name.split('.').pop()
     const fileName = `${tradeId}/${Date.now()}.${fileExt}`
 
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('trade-images')
       .upload(fileName, file)
 
@@ -129,7 +129,7 @@ export async function fetchTrades(): Promise<Trade[]> {
 
     const tradesWithImages = await Promise.all(
       trades.map(async (trade) => {
-        const { data: images, error: imagesError } = await supabase
+        const { data: images, error: imagesError } = await supabase!
           .from('trade_images')
           .select('*')
           .eq('trade_id', trade.id)

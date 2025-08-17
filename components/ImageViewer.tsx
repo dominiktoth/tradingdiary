@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Download, Maximize2 } from 'lucide-react'
-import { Dialog, DialogContent } from './ui/dialog'
 import { Button } from './ui/button'
 import { format } from 'date-fns'
 
