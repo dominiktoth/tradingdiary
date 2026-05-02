@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { TrendingUp, Plus, BarChart3, DollarSign, Target, Loader2 } from 'lucide-react'
+import { TrendingUp, Plus, BarChart3, DollarSign, Target, Loader2, Lock, Unlock } from 'lucide-react'
 import { Trade } from '@/types/trade'
 import TradeForm from '@/components/TradeForm'
 import TradeCard from '@/components/TradeCard'
@@ -12,6 +12,7 @@ import PasswordModal from '@/components/PasswordModal'
 import { Button } from '@/components/ui/button'
 import { createTrade, fetchTrades, deleteTrade, updateTrade } from '@/lib/supabase-helpers'
 import { isSupabaseConfigured } from '@/lib/supabase'
+import { isAuthenticated, setAuthenticated, clearAuthentication } from '@/lib/auth'
 
 export default function Home() {
   const [trades, setTrades] = useState<Trade[]>([])
@@ -22,6 +23,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [useSupabase, setUseSupabase] = useState(false)
+  const [isUnlocked, setIsUnlocked] = useState(false)
   const [passwordModal, setPasswordModal] = useState<{ isOpen: boolean; action: string; callback: () => void }>({
     isOpen: false,
     action: '',
@@ -29,6 +31,7 @@ export default function Home() {
   })
 
   useEffect(() => {
+    setIsUnlocked(isAuthenticated())
     if (isSupabaseConfigured()) {
       setUseSupabase(true)
       loadTradesFromSupabase()
@@ -36,6 +39,27 @@ export default function Home() {
       loadTradesFromLocalStorage()
     }
   }, [])
+
+  const requirePassword = (action: string, callback: () => void) => {
+    if (isAuthenticated()) {
+      callback()
+      return
+    }
+    setPasswordModal({
+      isOpen: true,
+      action,
+      callback: () => {
+        setAuthenticated()
+        setIsUnlocked(true)
+        callback()
+      }
+    })
+  }
+
+  const handleLock = () => {
+    clearAuthentication()
+    setIsUnlocked(false)
+  }
 
   const loadTradesFromSupabase = async () => {
     setIsLoading(true)
@@ -124,11 +148,7 @@ export default function Home() {
       }
     }
 
-    setPasswordModal({
-      isOpen: true,
-      action: 'delete trade',
-      callback: performDelete
-    })
+    requirePassword('delete trade', performDelete)
   }
 
   const handleViewTrade = (trade: Trade) => {
@@ -137,13 +157,9 @@ export default function Home() {
   }
 
   const handleEditTrade = (trade: Trade) => {
-    setPasswordModal({
-      isOpen: true,
-      action: 'edit trade',
-      callback: () => {
-        setEditingTrade(trade)
-        setIsFormOpen(true)
-      }
+    requirePassword('edit trade', () => {
+      setEditingTrade(trade)
+      setIsFormOpen(true)
     })
   }
 
@@ -193,33 +209,47 @@ export default function Home() {
               </div>
             </div>
             
-            <Button
-              onClick={() => {
-                setPasswordModal({
-                  isOpen: true,
-                  action: 'add trade',
-                  callback: () => {
+            <div className="flex items-center gap-2">
+              {isUnlocked && (
+                <Button
+                  onClick={handleLock}
+                  variant="outline"
+                  size="lg"
+                  title="Lock (require password again)"
+                >
+                  <Unlock className="h-5 w-5 mr-2" />
+                  Unlocked
+                </Button>
+              )}
+              <Button
+                onClick={() => {
+                  requirePassword('add trade', () => {
                     setEditingTrade(null)
                     setIsFormOpen(true)
-                  }
-                })
-              }}
-              size="lg"
-              className="shadow-lg"
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-5 w-5 mr-2" />
-                  Add Trade
-                </>
-              )}
-            </Button>
+                  })
+                }}
+                size="lg"
+                className="shadow-lg"
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : isUnlocked ? (
+                  <>
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Trade
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-5 w-5 mr-2" />
+                    Add Trade
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           <QuotesCarousel />
@@ -323,13 +353,9 @@ export default function Home() {
                 Start documenting your trades to track your progress
               </p>
               <Button onClick={() => {
-                setPasswordModal({
-                  isOpen: true,
-                  action: 'add your first trade',
-                  callback: () => {
-                    setEditingTrade(null)
-                    setIsFormOpen(true)
-                  }
+                requirePassword('add your first trade', () => {
+                  setEditingTrade(null)
+                  setIsFormOpen(true)
                 })
               }} size="lg">
                 <Plus className="h-5 w-5 mr-2" />
