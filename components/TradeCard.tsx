@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import Image from 'next/image'
-import { TrendingUp, TrendingDown, DollarSign, Target, Calendar, Eye, Trash2, Edit, Image as ImageIcon, AlertTriangle } from 'lucide-react'
+import { TrendingUp, TrendingDown, DollarSign, Target, Calendar, Eye, Trash2, Edit, BarChart3, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { Trade } from '@/types/trade'
 import { Button } from './ui/button'
@@ -48,39 +48,37 @@ export default function TradeCard({ trade, onView, onEdit, onDelete, index }: Tr
         className="bg-card rounded-xl border shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden cursor-pointer"
         onClick={() => onView(trade)}
       >
-      {trade.images.length > 0 && (
-        <div className="relative h-48 bg-muted overflow-hidden">
-          <Image
-            src={trade.images[0].url}
-            alt="Trade screenshot"
-            fill
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          
-          {trade.images.length > 1 && (
-            <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1">
-              <ImageIcon className="h-3 w-3" />
-              {trade.images.length}
-            </div>
-          )}
+      {(() => {
+        const previewImage =
+          trade.images.find(img => img.category === 'entry') || trade.images[0]
+        if (!previewImage) return null
+        return (
+          <div className="relative h-48 bg-muted overflow-hidden">
+            <Image
+              src={previewImage.url}
+              alt="Entry chart"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-          <div className="absolute bottom-2 left-2 flex items-center gap-2">
-            <div className={cn(
-              "px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1",
-              trade.type === 'long' 
-                ? 'bg-green-500/20 text-green-400 backdrop-blur-sm' 
-                : 'bg-red-500/20 text-red-400 backdrop-blur-sm'
-            )}>
-              {trade.type === 'long' ? 
-                <TrendingUp className="h-3 w-3" /> : 
-                <TrendingDown className="h-3 w-3" />
-              }
-              {trade.type.toUpperCase()}
+            <div className="absolute bottom-2 left-2 flex items-center gap-2">
+              <div className={cn(
+                "px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1",
+                trade.type === 'long'
+                  ? 'bg-green-500/20 text-green-400 backdrop-blur-sm'
+                  : 'bg-red-500/20 text-red-400 backdrop-blur-sm'
+              )}>
+                {trade.type === 'long' ?
+                  <TrendingUp className="h-3 w-3" /> :
+                  <TrendingDown className="h-3 w-3" />
+                }
+                {trade.type.toUpperCase()}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between">
@@ -89,7 +87,16 @@ export default function TradeCard({ trade, onView, onEdit, onDelete, index }: Tr
               <Calendar className="h-3 w-3" />
               {format(trade.entryTime, 'MMM dd, yyyy HH:mm')}
             </div>
-            <p className="font-medium text-sm line-clamp-1">{trade.pdArray}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary font-medium flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                HTF {trade.htfC2t}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 font-medium flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {trade.entryInterval}
+              </span>
+            </div>
           </div>
 
           <div className={cn(
@@ -114,7 +121,7 @@ export default function TradeCard({ trade, onView, onEdit, onDelete, index }: Tr
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-xs text-muted-foreground">P&L %</p>
+                <p className="text-xs text-muted-foreground">P&amp;L %</p>
                 <p className={cn("text-sm font-medium", profitLossColor)}>
                   {isProfitable ? '+' : ''}{trade.profitLossPercent.toFixed(2)}%
                 </p>

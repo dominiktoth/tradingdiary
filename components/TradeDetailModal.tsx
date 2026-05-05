@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, TrendingUp, TrendingDown, DollarSign, Target, Calendar, Clock, FileText, Brain, ChevronLeft, ChevronRight, Download, ZoomIn } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, DollarSign, Target, Calendar, Clock, Brain, ChevronLeft, ChevronRight, Download, ZoomIn, BarChart3 } from 'lucide-react'
 import { format } from 'date-fns'
-import { Trade } from '@/types/trade'
+import { Trade, IMAGE_CATEGORIES, IMAGE_CATEGORY_LABELS } from '@/types/trade'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
@@ -16,34 +16,34 @@ interface TradeDetailModalProps {
 }
 
 export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetailModalProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
-  const [isImageFullscreen, setIsImageFullscreen] = useState(false)
+  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null)
 
-  // Reset selected image when trade changes
   React.useEffect(() => {
-    setSelectedImageIndex(0)
-    setIsImageFullscreen(false)
+    setFullscreenIndex(null)
   }, [trade])
 
-  // Keyboard navigation for images - must be before conditional return
+  // Stable, ordered array of images by category (htf, seven_hour, entry)
+  const orderedImages = React.useMemo(() => {
+    if (!trade) return []
+    return IMAGE_CATEGORIES
+      .map(cat => trade.images.find(i => i.category === cat))
+      .filter((i): i is NonNullable<typeof i> => !!i)
+  }, [trade])
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen || !trade || !trade.images || trade.images.length === 0) return
-      
+      if (fullscreenIndex === null || orderedImages.length === 0) return
       if (e.key === 'ArrowLeft') {
-        setSelectedImageIndex((prev) => 
-          prev > 0 ? prev - 1 : trade.images.length - 1
-        )
+        setFullscreenIndex(prev => (prev === null ? null : (prev > 0 ? prev - 1 : orderedImages.length - 1)))
       } else if (e.key === 'ArrowRight') {
-        setSelectedImageIndex((prev) => 
-          prev < trade.images.length - 1 ? prev + 1 : 0
-        )
+        setFullscreenIndex(prev => (prev === null ? null : (prev < orderedImages.length - 1 ? prev + 1 : 0)))
+      } else if (e.key === 'Escape') {
+        setFullscreenIndex(null)
       }
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, trade])
+  }, [fullscreenIndex, orderedImages.length])
 
   if (!trade) return null
 
@@ -51,29 +51,24 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
   const profitLossColor = isProfitable ? 'text-green-500' : 'text-red-500'
   const profitLossBg = isProfitable ? 'bg-green-500/10' : 'bg-red-500/10'
 
-  const handlePrevImage = (e?: React.MouseEvent) => {
-    e?.stopPropagation()
-    setSelectedImageIndex((prev) => 
-      prev > 0 ? prev - 1 : trade.images.length - 1
-    )
-  }
+  const fullscreenImage = fullscreenIndex !== null ? orderedImages[fullscreenIndex] : null
 
-  const handleNextImage = (e?: React.MouseEvent) => {
+  const handlePrev = (e?: React.MouseEvent) => {
     e?.stopPropagation()
-    setSelectedImageIndex((prev) => 
-      prev < trade.images.length - 1 ? prev + 1 : 0
-    )
+    setFullscreenIndex(prev => (prev === null ? null : (prev > 0 ? prev - 1 : orderedImages.length - 1)))
   }
-
-  const handleDownloadImage = () => {
-    if (trade.images[selectedImageIndex]) {
-      const link = document.createElement('a')
-      link.href = trade.images[selectedImageIndex].url
-      link.download = trade.images[selectedImageIndex].name
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setFullscreenIndex(prev => (prev === null ? null : (prev < orderedImages.length - 1 ? prev + 1 : 0)))
+  }
+  const handleDownload = () => {
+    if (!fullscreenImage) return
+    const link = document.createElement('a')
+    link.href = fullscreenImage.url
+    link.download = fullscreenImage.name
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   return (
@@ -96,14 +91,14 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
           >
             <div className="flex h-full">
               <div className="flex-1 overflow-y-auto">
-                <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b p-4 flex items-center justify-between">
+                <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b p-4 flex items-center justify-between z-10">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2 rounded-lg",
                       trade.type === 'long' ? 'bg-green-500/10' : 'bg-red-500/10'
                     )}>
-                      {trade.type === 'long' ? 
-                        <TrendingUp className="h-5 w-5 text-green-500" /> : 
+                      {trade.type === 'long' ?
+                        <TrendingUp className="h-5 w-5 text-green-500" /> :
                         <TrendingDown className="h-5 w-5 text-red-500" />
                       }
                     </div>
@@ -114,11 +109,7 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={onClose}
-                  >
+                  <Button size="icon" variant="ghost" onClick={onClose}>
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
@@ -130,9 +121,7 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                         <Calendar className="h-3 w-3" />
                         Entry Time
                       </p>
-                      <p className="font-medium">
-                        {format(trade.entryTime, 'HH:mm:ss')}
-                      </p>
+                      <p className="font-medium">{format(trade.entryTime, 'HH:mm:ss')}</p>
                     </div>
 
                     {trade.exitTime && (
@@ -141,9 +130,7 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                           <Clock className="h-3 w-3" />
                           Exit Time
                         </p>
-                        <p className="font-medium">
-                          {format(trade.exitTime, 'HH:mm:ss')}
-                        </p>
+                        <p className="font-medium">{format(trade.exitTime, 'HH:mm:ss')}</p>
                       </div>
                     )}
 
@@ -152,9 +139,7 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                         <Target className="h-3 w-3" />
                         Risk:Reward
                       </p>
-                      <p className="font-medium text-lg">
-                        1:{trade.riskReward.toFixed(2)}
-                      </p>
+                      <p className="font-medium text-lg">1:{trade.riskReward.toFixed(2)}</p>
                     </div>
 
                     <div className="space-y-1">
@@ -169,10 +154,7 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className={cn(
-                      "p-4 rounded-lg border",
-                      profitLossBg
-                    )}>
+                    <div className={cn("p-4 rounded-lg border", profitLossBg)}>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -194,137 +176,67 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                       </div>
                     </div>
 
-                    <div className="p-4 rounded-lg border bg-muted/50">
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
-                        <FileText className="h-3 w-3" />
-                        PD Array
-                      </p>
-                      <p className="font-medium">{trade.pdArray}</p>
+                    <div className="p-4 rounded-lg border bg-muted/50 grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
+                          <BarChart3 className="h-3 w-3" />
+                          HTF C2T
+                        </p>
+                        <p className="font-medium text-lg">{trade.htfC2t}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mb-1">
+                          <Clock className="h-3 w-3" />
+                          Entry Interval
+                        </p>
+                        <p className="font-medium text-lg">{trade.entryInterval}</p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <Brain className="h-3 w-3" />
-                      Trading Thoughts & Analysis
+                      Trading Thoughts &amp; Analysis
                     </p>
                     <div className="p-4 rounded-lg border bg-muted/30">
                       <p className="whitespace-pre-wrap">{trade.thoughts}</p>
                     </div>
                   </div>
 
-                  {trade.images.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          Trade Screenshots ({selectedImageIndex + 1} / {trade.images.length})
-                        </p>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleDownloadImage}
-                            disabled={!trade.images[selectedImageIndex]}
-                          >
-                            <Download className="h-4 w-4 mr-1" />
-                            Download
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setIsImageFullscreen(true)}
-                            disabled={!trade.images[selectedImageIndex]}
-                          >
-                            <ZoomIn className="h-4 w-4 mr-1" />
-                            Fullscreen
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                          {trade.images[selectedImageIndex] && (
-                            <Image
-                              src={trade.images[selectedImageIndex].url}
-                              alt={trade.images[selectedImageIndex].name}
-                              fill
-                              className="object-contain"
-                              sizes="(max-width: 768px) 100vw, 50vw"
-                            />
-                          )}
-                        </div>
-
-                        {trade.images.length > 1 && (
-                          <>
-                            <button
-                              onClick={handlePrevImage}
-                              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                            >
-                              <ChevronLeft className="h-5 w-5" />
-                            </button>
-                            <button
-                              onClick={handleNextImage}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                            >
-                              <ChevronRight className="h-5 w-5" />
-                            </button>
-
-                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                              {trade.images.map((_, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => setSelectedImageIndex(index)}
-                                  className={cn(
-                                    "w-2 h-2 rounded-full transition-colors",
-                                    index === selectedImageIndex
-                                      ? "bg-white"
-                                      : "bg-white/50 hover:bg-white/75"
-                                  )}
-                                />
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {trade.images.length > 1 && (
-                        <div className="space-y-2">
-                          <p className="text-xs text-muted-foreground">
-                            Click on thumbnails or use arrow keys to navigate
-                          </p>
-                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-                            {trade.images.map((image, index) => (
-                              <motion.button
-                                key={image.id}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => setSelectedImageIndex(index)}
-                                className={cn(
-                                  "relative aspect-video rounded overflow-hidden border-2 transition-all",
-                                  index === selectedImageIndex
-                                    ? "border-primary ring-2 ring-primary/20"
-                                    : "border-transparent hover:border-muted-foreground/50"
-                                )}
+                  {orderedImages.length > 0 && (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">Charts</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {IMAGE_CATEGORIES.map((category, catIndex) => {
+                          const img = trade.images.find(i => i.category === category)
+                          if (!img) return null
+                          const idxInOrdered = orderedImages.findIndex(o => o.id === img.id)
+                          return (
+                            <div key={category} className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                {IMAGE_CATEGORY_LABELS[category]}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setFullscreenIndex(idxInOrdered >= 0 ? idxInOrdered : catIndex)}
+                                className="relative aspect-video w-full rounded-lg overflow-hidden border bg-muted group cursor-zoom-in"
                               >
                                 <Image
-                                  src={image.url}
-                                  alt={image.name}
+                                  src={img.url}
+                                  alt={IMAGE_CATEGORY_LABELS[category]}
                                   fill
-                                  className="object-cover"
-                                  sizes="100px"
+                                  className="object-cover transition-transform group-hover:scale-[1.02]"
+                                  sizes="(max-width: 768px) 100vw, 33vw"
                                 />
-                                {index === selectedImageIndex && (
-                                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                    <div className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                                      {index + 1}
-                                    </div>
-                                  </div>
-                                )}
-                              </motion.button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                  <ZoomIn className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -332,39 +244,32 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
             </div>
           </motion.div>
 
-          {isImageFullscreen && trade.images[selectedImageIndex] && (
+          {fullscreenImage && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[60] bg-black flex items-center justify-center"
-              onClick={() => setIsImageFullscreen(false)}
+              onClick={() => setFullscreenIndex(null)}
             >
               <Image
-                src={trade.images[selectedImageIndex].url}
-                alt={trade.images[selectedImageIndex].name}
+                src={fullscreenImage.url}
+                alt={IMAGE_CATEGORY_LABELS[fullscreenImage.category]}
                 fill
                 className="object-contain"
                 sizes="100vw"
               />
-              
-              {/* Navigation buttons in fullscreen */}
-              {trade.images.length > 1 && (
+
+              {orderedImages.length > 1 && (
                 <>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlePrevImage(e)
-                    }}
+                    onClick={handlePrev}
                     className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
                   >
                     <ChevronLeft className="h-8 w-8" />
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleNextImage(e)
-                    }}
+                    onClick={handleNext}
                     className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
                   >
                     <ChevronRight className="h-8 w-8" />
@@ -372,17 +277,19 @@ export default function TradeDetailModal({ trade, isOpen, onClose }: TradeDetail
                 </>
               )}
 
-              {/* Image counter */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full">
-                {selectedImageIndex + 1} / {trade.images.length}
+              <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm">
+                {IMAGE_CATEGORY_LABELS[fullscreenImage.category]}
               </div>
 
-              {/* Close button */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsImageFullscreen(false)
-                }}
+                onClick={(e) => { e.stopPropagation(); handleDownload() }}
+                className="absolute top-4 right-16 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                title="Download"
+              >
+                <Download className="h-5 w-5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setFullscreenIndex(null) }}
                 className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
               >
                 <X className="h-6 w-6" />

@@ -1,17 +1,23 @@
 "use client"
 
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import Image from 'next/image'
-import { Plus, X, TrendingUp, TrendingDown, DollarSign, Target, Calendar, FileText, Brain } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, DollarSign, Target, Calendar, Brain, Clock, BarChart3 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
-import ImageUpload from './ImageUpload'
-import { Trade, TradeImage } from '@/types/trade'
+import SingleImageUpload from './SingleImageUpload'
+import {
+  Trade,
+  TradeImage,
+  ImageCategory,
+  IMAGE_CATEGORIES,
+  IMAGE_CATEGORY_LABELS,
+  HTF_C2T_OPTIONS,
+  ENTRY_INTERVAL_OPTIONS,
+} from '@/types/trade'
 import { format } from 'date-fns'
 
 interface TradeFormProps {
@@ -19,6 +25,16 @@ interface TradeFormProps {
   onClose: () => void
   onSubmit: (trade: Omit<Trade, 'id' | 'createdAt' | 'updatedAt'>) => void
   editTrade?: Trade | null
+}
+
+type ImageSlots = Record<ImageCategory, TradeImage | null>
+
+const emptySlots = (): ImageSlots => ({ htf: null, seven_hour: null, entry: null })
+
+const slotsFromTrade = (trade: Trade): ImageSlots => {
+  const slots = emptySlots()
+  for (const img of trade.images) slots[img.category] = img
+  return slots
 }
 
 export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: TradeFormProps) {
@@ -29,12 +45,13 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
     riskReward: '',
     profitLoss: '',
     profitLossPercent: '',
-    pdArray: '',
+    htfC2t: '30m',
+    entryInterval: '3m',
     thoughts: '',
-    images: [] as TradeImage[]
   })
+  const [images, setImages] = useState<ImageSlots>(emptySlots)
+  const [error, setError] = useState('')
 
-  // Load edit data when editTrade changes
   React.useEffect(() => {
     if (editTrade) {
       setFormData({
@@ -44,12 +61,12 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
         riskReward: editTrade.riskReward.toString(),
         profitLoss: editTrade.profitLoss.toString(),
         profitLossPercent: editTrade.profitLossPercent?.toString() || '',
-        pdArray: editTrade.pdArray,
+        htfC2t: editTrade.htfC2t,
+        entryInterval: editTrade.entryInterval,
         thoughts: editTrade.thoughts,
-        images: editTrade.images || []
       })
+      setImages(slotsFromTrade(editTrade))
     } else {
-      // Reset form for new trade
       setFormData({
         entryTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         exitTime: '',
@@ -57,16 +74,44 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
         riskReward: '',
         profitLoss: '',
         profitLossPercent: '',
-        pdArray: '',
+        htfC2t: '30m',
+        entryInterval: '3m',
         thoughts: '',
-        images: []
       })
+      setImages(emptySlots())
     }
-  }, [editTrade])
+    setError('')
+  }, [editTrade, isOpen])
+
+  const handleFileSelected = (category: ImageCategory) => (file: File) => {
+    setImages(prev => ({
+      ...prev,
+      [category]: {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+        url: URL.createObjectURL(file),
+        name: file.name,
+        category,
+        uploadDate: new Date(),
+      },
+    }))
+    setError('')
+  }
+
+  const handleRemoveImage = (category: ImageCategory) => () => {
+    setImages(prev => ({ ...prev, [category]: null }))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    const missing = IMAGE_CATEGORIES.filter(c => images[c] === null)
+    if (missing.length > 0) {
+      setError(`Please upload all 3 images: ${missing.map(c => IMAGE_CATEGORY_LABELS[c]).join(', ')} missing.`)
+      return
+    }
+
+    const imagesArray = IMAGE_CATEGORIES.map(c => images[c]!)
+
     onSubmit({
       entryTime: new Date(formData.entryTime),
       exitTime: formData.exitTime ? new Date(formData.exitTime) : undefined,
@@ -74,45 +119,13 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
       riskReward: parseFloat(formData.riskReward) || 0,
       profitLoss: parseFloat(formData.profitLoss) || 0,
       profitLossPercent: formData.profitLossPercent ? parseFloat(formData.profitLossPercent) : undefined,
-      pdArray: formData.pdArray,
+      htfC2t: formData.htfC2t,
+      entryInterval: formData.entryInterval,
       thoughts: formData.thoughts,
-      images: formData.images
+      images: imagesArray,
     })
 
-    setFormData({
-      entryTime: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-      exitTime: '',
-      type: 'long',
-      riskReward: '',
-      profitLoss: '',
-      profitLossPercent: '',
-      pdArray: '',
-      thoughts: '',
-      images: []
-    })
-    
     onClose()
-  }
-
-  const handleImagesUploaded = (files: File[]) => {
-    const newImages: TradeImage[] = files.map(file => ({
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      url: URL.createObjectURL(file),
-      name: file.name,
-      uploadDate: new Date()
-    }))
-    
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newImages]
-    }))
-  }
-
-  const removeImage = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter(img => img.id !== id)
-    }))
   }
 
   return (
@@ -136,7 +149,7 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                 id="entryTime"
                 type="datetime-local"
                 value={formData.entryTime}
-                onChange={(e) => setFormData(prev => ({ ...prev, entryTime: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, entryTime: e.target.value }))}
                 required
               />
             </div>
@@ -150,17 +163,18 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                 id="exitTime"
                 type="datetime-local"
                 value={formData.exitTime}
-                onChange={(e) => setFormData(prev => ({ ...prev, exitTime: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, exitTime: e.target.value }))}
               />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="type" className="flex items-center gap-2">
-              {formData.type === 'long' ? 
-                <TrendingUp className="h-4 w-4 text-green-500" /> : 
+              {formData.type === 'long' ? (
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              ) : (
                 <TrendingDown className="h-4 w-4 text-red-500" />
-              }
+              )}
               Position Type
             </Label>
             <Select
@@ -187,6 +201,48 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
             </Select>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="htfC2t" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                HTF C2T
+              </Label>
+              <Select
+                value={formData.htfC2t}
+                onValueChange={value => setFormData(prev => ({ ...prev, htfC2t: value }))}
+              >
+                <SelectTrigger id="htfC2t">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HTF_C2T_OPTIONS.map(tf => (
+                    <SelectItem key={tf} value={tf}>{tf}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="entryInterval" className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                Entry Interval
+              </Label>
+              <Select
+                value={formData.entryInterval}
+                onValueChange={value => setFormData(prev => ({ ...prev, entryInterval: value }))}
+              >
+                <SelectTrigger id="entryInterval">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTRY_INTERVAL_OPTIONS.map(tf => (
+                    <SelectItem key={tf} value={tf}>{tf}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="riskReward" className="flex items-center gap-2">
@@ -199,7 +255,7 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                 step="0.01"
                 placeholder="e.g., 2.5"
                 value={formData.riskReward}
-                onChange={(e) => setFormData(prev => ({ ...prev, riskReward: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, riskReward: e.target.value }))}
                 required
               />
             </div>
@@ -215,7 +271,7 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                 step="0.01"
                 placeholder="e.g., 150.50"
                 value={formData.profitLoss}
-                onChange={(e) => setFormData(prev => ({ ...prev, profitLoss: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, profitLoss: e.target.value }))}
                 required
               />
             </div>
@@ -231,73 +287,41 @@ export default function TradeForm({ isOpen, onClose, onSubmit, editTrade }: Trad
                 step="0.01"
                 placeholder="e.g., 2.5"
                 value={formData.profitLossPercent}
-                onChange={(e) => setFormData(prev => ({ ...prev, profitLossPercent: e.target.value }))}
+                onChange={e => setFormData(prev => ({ ...prev, profitLossPercent: e.target.value }))}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="pdArray" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              PD Array
-            </Label>
-            <Input
-              id="pdArray"
-              type="text"
-              placeholder="e.g., FVG, Order Block, Liquidity Sweep"
-              value={formData.pdArray}
-              onChange={(e) => setFormData(prev => ({ ...prev, pdArray: e.target.value }))}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="thoughts" className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
-              Trading Thoughts & Analysis
+              Trading Thoughts &amp; Analysis
             </Label>
             <Textarea
               id="thoughts"
               placeholder="Describe your thought process, market analysis, and lessons learned..."
               value={formData.thoughts}
-              onChange={(e) => setFormData(prev => ({ ...prev, thoughts: e.target.value }))}
+              onChange={e => setFormData(prev => ({ ...prev, thoughts: e.target.value }))}
               className="min-h-[100px]"
               required
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              Trade Screenshots
-            </Label>
-            <ImageUpload onImagesUploaded={handleImagesUploaded} />
-            
-            {formData.images.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {formData.images.map((image) => (
-                  <motion.div
-                    key={image.id}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative group h-24"
-                  >
-                    <Image
-                      src={image.url}
-                      alt={image.name}
-                      fill
-                      className="object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(image.id)}
-                      className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-            )}
+          <div className="space-y-3">
+            <Label>Charts</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {IMAGE_CATEGORIES.map(category => (
+                <SingleImageUpload
+                  key={category}
+                  label={IMAGE_CATEGORY_LABELS[category]}
+                  imageUrl={images[category]?.url}
+                  imageName={images[category]?.name}
+                  onFileSelected={handleFileSelected(category)}
+                  onRemove={handleRemoveImage(category)}
+                />
+              ))}
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
 
           <div className="flex justify-end gap-3">
